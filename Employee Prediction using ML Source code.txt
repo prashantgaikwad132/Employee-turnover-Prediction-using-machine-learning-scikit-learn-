@@ -1,0 +1,352 @@
+# Employee Turnover Prediction with Machine Learning
+
+## Data Preprocessing
+
+
+
+import pandas as pd
+
+
+
+pg=pd.read_csv("HR.csv")
+
+
+
+col_names = pg.columns.tolist()
+
+
+
+print("Column names:")
+
+print(col_names)
+
+
+
+print("Sample data")
+
+pg.head()
+
+pg.dtypes
+
+
+
+pg.isnull().any()
+
+
+
+#### Our data is pretty clean, no missing values
+
+
+
+pg.shape
+
+
+
+#### The data contains 14,999 employees and 10 features
+
+
+
+pg.head()
+
+
+
+pg['Department'].unique
+
+
+
+#Combining technical ,support and IT together as technical.
+
+
+import numpy as np
+
+
+
+pg['Department']=np.where(pg['Department']=='support','technical',pg['Department'])
+
+
+pg['Department']=np.where(pg['Department']=='IT','technical',pg['Department'])
+
+
+
+pg['Department'].unique
+
+
+
+## Data Exploration
+
+pg
+
+pg['left'].value_counts()
+
+
+
+#### There are 11428 people left and 3571 stayed according to our data
+
+
+
+pg.groupby('left').mean()
+
+
+
+### Several observation:
+  
+  
+The average satisfaction level of employees who stayed with the company is higher than that of the employees who left.
+
+
+  The average monthly work hours of employees who left the company is more than that of the employees who stayed.
+  
+
+The employees who had workplace accidents are less likely to leave than that of the employee who did not have workplace accidents.
+  
+
+The employees who were promoted in the last five years are less likely to leave than those who did not get a promotion in the last five years
+
+
+
+pg.groupby('Department').mean()
+
+
+
+pg.groupby('salary').mean()
+
+
+
+## Data Visualization
+
+
+
+### Bar chart for department employee work and the frequency of turnover
+
+
+
+%matplotlib inline
+
+import matplotlib.pyplot as plt
+
+
+pd.crosstab(pg.Department,pg.left).plot(kind='bar')
+
+plt.title('Turnover Frequency for Department')
+
+plt.xlabel('Department')
+
+plt.ylabel('Frequency of Turnover')
+
+plt.savefig('department_bar_chart')
+
+
+
+# Data Statistics
+
+
+
+pg.describe()
+
+
+
+#### It is evident that the frequency of employee turnover depends a great deal on the department they work for. Thus, department can be a good predictor of the outcome variable.
+
+
+
+### Bar chart for employee salary level and the frequency of turnover
+
+
+
+table=pd.crosstab(pg.salary, pg.left)
+
+table.div(table.sum(1).astype(float), axis=0).plot(kind='bar', stacked=True)
+
+plt.title('Stacked Bar Chart of Salary Level vs Turnover')
+
+plt.xlabel('Salary Level')
+
+plt.ylabel('Proportion of Employees')
+
+plt.savefig('salary_bar_chart')
+
+
+
+#### The proportion of the employee turnover depends a great deal on their salary level; hence, salary level can be a good predictor in predicting the outcome.
+
+
+
+## Histogram of numeric variables
+
+num_bins = 10
+
+pg.hist(bins=num_bins, figsize=(20,15))
+
+plt.savefig("pg_histogram_plots")
+
+plt.show()
+
+
+
+## Creating Dummy Variables for Categorical Variables
+
+
+
+cat_vars=['Department','salary']
+
+for var in cat_vars:
+   
+   cat_list='var'+'_'+var
+   
+   cat_list = pd.get_dummies(pg[var], prefix=var)
+    
+   pg1=pg.join(cat_list)
+    
+   pg=pg1
+
+
+
+pg.drop(pg.columns[[8, 9]], axis=1, inplace=True)
+pg.columns.values
+
+
+
+#### The outcome variable is “left”, and all the other variables are predictors.
+
+
+
+pg_vars=pg.columns.values.tolist()
+
+y=['left']
+
+X=[i for i in pg_vars if i not in y]
+
+
+
+from sklearn.feature_selection import RFE
+
+from sklearn.linear_model import LogisticRegression
+
+
+
+model = LogisticRegression()
+
+
+rfe = RFE(model, 10)
+
+rfe = rfe.fit(pg[X],pg[y])
+
+print(rfe.support_)
+
+print(rfe.ranking_)
+
+
+
+#### You can see that RFE chose the 10 variables for us, which are marked True in the support_ array and marked with a choice “1” in the ranking_array. They are:
+
+
+
+### [‘satisfaction_level’, ‘last_evaluation’, ‘time_spend_company’, ‘Work_accident’, ‘promotion_last_5years’, ‘department_RandD’, ‘department_hr’, ‘department_management’, ‘salary_high’, ‘salary_low’]
+
+
+
+cols=['satisfaction_level', 'last_evaluation', 'time_spend_company', 'Work_accident', 'promotion_last_5years', 
+      'Department_RandD', 'Department_hr', 'Department_management', 'salary_high', 'salary_low']
+X=pg[cols]
+
+y=pg['left']
+
+
+
+## Logistic Regression Model
+
+
+
+from sklearn.model_selection import train_test_split
+
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=0)
+
+
+
+from sklearn.linear_model import LogisticRegression
+
+from sklearn import metrics
+
+
+
+logreg = LogisticRegression()
+
+logreg.fit(X_train, y_train)
+
+
+
+from sklearn.metrics import accuracy_score
+
+print('Logistic regression accuracy: {:.3f}'.format(accuracy_score(y_test, logreg.predict(X_test))))
+
+
+
+### Logistic regression is giving 77.1% accuracy
+
+
+
+## Random Forest
+
+
+
+from sklearn.ensemble import RandomForestClassifier
+
+rf = RandomForestClassifier()
+
+rf.fit(X_train, y_train)
+
+
+print('Random Forest Accuracy: {:.3f}'.format(accuracy_score(y_test, rf.predict(X_test))))
+
+
+
+### Random forest is giving 97.8% accuaracy
+
+
+
+## Support Vector Machine
+
+
+
+from sklearn.svm import SVC
+
+svc = SVC()
+
+svc.fit(X_train, y_train)
+
+
+
+print('Support vector machine accuracy: {:.3f}'.format(accuracy_score(y_test, svc.predict(X_test))))
+
+
+
+### SVM is giving 90.7% accuracy
+
+
+
+## To avoid over fitting let us apply cross-validation
+
+
+
+from sklearn import model_selection
+
+from sklearn.model_selection import cross_val_score
+
+kfold = model_selection.KFold(n_splits=10, random_state=7)
+
+modelCV = RandomForestClassifier()
+
+scoring = 'accuracy'
+
+results = model_selection.cross_val_score(modelCV, X_train, y_train, cv=kfold, scoring=scoring)
+
+print("10-fold cross validation average accuracy: %.3f" % (results.mean()))
+
+
+
+### 10-fold cross validation is giving 97.8% accuracy
+
+
+
+### The avarage accuracy is close to random forest accuracy so we can say that model generalizes well.
